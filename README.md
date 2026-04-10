@@ -37,6 +37,7 @@ python -m pip install -r requirements.txt
 python -m pytest tests/
 python -m pylint .
 python -m black --check .
+# Run twice: first pass may auto-fix files, second confirms a clean state.
 pre-commit run --all-files
 pre-commit run --all-files
 ```
