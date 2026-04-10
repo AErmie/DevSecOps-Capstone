@@ -2,7 +2,7 @@ name: Main Workflow
 on:
   push:
     branches:
-      - main
+    - main
   workflow_dispatch:
 
 permissions:
@@ -48,4 +48,5 @@ jobs:
       report_name: Main Branch Security Feedback Report
       artifact_name: main-security-feedback-report
       source_sha: ${{ github.sha }}
+      caller_run_id: ${{ github.run_id }}
       wait_for_codeql: false

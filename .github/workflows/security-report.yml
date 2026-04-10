@@ -38,6 +38,11 @@ on:
         required: false
         type: string
         default: ""
+      caller_run_id:
+        description: Workflow run id from caller workflow for job-level fallback lookup.
+        required: false
+        type: string
+        default: ""
       head_repo_full_name:
         description: Full name of the PR head repository for fork-safe comment posting.
         required: false
@@ -92,6 +97,7 @@ jobs:
           CODEQL_POLL_INTERVAL_SECONDS: ${{ inputs.codeql_poll_interval_seconds }}
           SOURCE_SHA: ${{ inputs.source_sha }}
           FALLBACK_SHA: ${{ inputs.fallback_sha }}
+          CALLER_RUN_ID: ${{ inputs.caller_run_id }}
         with:
           script: |
             const fs = require("fs");
@@ -141,12 +147,13 @@ jobs:
             };
 
             const fetchWorkflowJobsAsCheckRuns = async () => {
+              const workflowRunId = Number(process.env.CALLER_RUN_ID || context.runId);
               const jobs = await github.paginate(
                 github.rest.actions.listJobsForWorkflowRun,
                 {
                   owner,
                   repo,
-                  run_id: context.runId,
+                  run_id: workflowRunId,
                   per_page: 100,
                 },
                 (response) => response.data.jobs,
