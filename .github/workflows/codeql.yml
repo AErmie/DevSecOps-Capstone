@@ -1,0 +1,79 @@
+name: CodeQL SAST
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+jobs:
+  codeql-analyze:
+    name: CodeQL Analyze
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  codeql-high-severity-gate:
+    name: CodeQL High Severity Gate
+    runs-on: ubuntu-latest
+    needs: codeql-analyze
+    permissions:
+      contents: read
+      security-events: read
+
+    steps:
+      - name: Fail on high-severity CodeQL alerts
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const ref = context.ref;
+
+            const alerts = await github.paginate(
+              github.rest.codeScanning.listAlertsForRepo,
+              {
+                owner,
+                repo,
+                ref,
+                state: 'open',
+                tool_name: 'CodeQL',
+                per_page: 100
+              }
+            );
+
+            const isHighOrCritical = (alert) => {
+              const level = String(alert?.rule?.security_severity_level || '').toLowerCase();
+              const severity = String(alert?.rule?.severity || '').toLowerCase();
+              return level === 'high' || level === 'critical' || severity === 'high' || severity === 'error';
+            };
+
+            const blockers = alerts.filter(isHighOrCritical);
+
+            if (blockers.length > 0) {
+              core.setFailed(`CodeQL gate failed: ${blockers.length} high/critical alert(s) detected on ${ref}.`);
+              return;
+            }
+
+            core.info(`CodeQL gate passed: no high/critical alerts detected on ${ref}.`);
