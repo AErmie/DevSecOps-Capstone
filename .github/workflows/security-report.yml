@@ -245,6 +245,9 @@ jobs:
     if: ${{ inputs.post_pr_comment && inputs.pr_number != '' }}
     needs:
       - security-feedback-report
+    permissions:
+      pull-requests: write
+      issues: write
 
     steps:
 
