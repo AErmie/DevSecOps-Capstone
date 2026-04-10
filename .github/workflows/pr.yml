@@ -11,6 +11,9 @@ permissions:
   contents: read
   security-events: write
   actions: read
+  checks: read
+  pull-requests: write
+  issues: write
 
 jobs:
     secret-scan:
@@ -27,3 +30,17 @@ jobs:
     unit-sec-scan:
         uses: ./.github/workflows/unit-sec-test.yml
         needs: lint-format
+
+    security-feedback-report:
+        if: always()
+        needs:
+          - secret-scan
+          - build-image
+          - lint-format
+          - unit-sec-scan
+        uses: ./.github/workflows/security-report.yml
+        with:
+          report_name: PR Security Feedback Report
+          artifact_name: pr-security-feedback-report
+          post_pr_comment: true
+          pr_number: ${{ github.event.pull_request.number }}

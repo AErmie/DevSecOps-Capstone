@@ -9,6 +9,9 @@ permissions:
   contents: read
   security-events: write
   actions: read
+  checks: read
+  pull-requests: write
+  issues: write
   id-token: write
   packages: write
 
@@ -31,3 +34,15 @@ jobs:
   push-docker-image:
     uses: ./.github/workflows/push-docker-image.yml
     needs: unit-sec-scan
+
+  security-feedback-report:
+    if: always()
+    needs:
+      - secret-scan
+      - build-image
+      - lint-format
+      - unit-sec-scan
+    uses: ./.github/workflows/security-report.yml
+    with:
+      report_name: Main Branch Security Feedback Report
+      artifact_name: main-security-feedback-report

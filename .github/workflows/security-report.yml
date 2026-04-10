@@ -1,0 +1,248 @@
+name: Security Feedback Report
+
+on:
+  workflow_call:
+    inputs:
+      report_name:
+        description: Human-readable report title.
+        required: false
+        type: string
+        default: Security Feedback Report
+      artifact_name:
+        description: Artifact name for the generated markdown report.
+        required: false
+        type: string
+        default: security-feedback-report
+      expected_baseline_checks:
+        description: Comma-separated check names that are expected to fail in current baseline.
+        required: false
+        type: string
+        default: Run Trivy security scanner against the image,Run OWASP ZAP DAST scan
+      post_pr_comment:
+        description: Whether to publish/update a PR comment with the report.
+        required: false
+        type: boolean
+        default: false
+      pr_number:
+        description: Pull request number for PR comment posting.
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  actions: read
+  checks: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  security-feedback-report:
+    name: Generate Security Feedback Report
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build consolidated security report
+        id: build_report
+        uses: actions/github-script@v7
+        env:
+          REPORT_NAME: ${{ inputs.report_name }}
+          EXPECTED_BASELINE_CHECKS: ${{ inputs.expected_baseline_checks }}
+        with:
+          script: |
+            const fs = require("fs");
+
+            const expectedPatterns = process.env.EXPECTED_BASELINE_CHECKS
+              .split(",")
+              .map((item) => item.trim())
+              .filter(Boolean);
+
+            const scannerTargets = [
+              { label: "Secret Scan (GitLeaks)", matchers: ["Scan for leaked secrets", "secret-scan"] },
+              { label: "Semgrep SAST", matchers: ["Run Semgrep SAST scan", "Semgrep OSS"] },
+              { label: "Trivy SCA", matchers: ["Run Trivy security scanner", "Trivy"] },
+              { label: "OWASP ZAP DAST", matchers: ["Run OWASP ZAP DAST scan", "OWASP ZAP"] },
+              { label: "CodeQL", matchers: ["CodeQL Analysis", "CodeQL"] },
+              { label: "GitGuardian", matchers: ["GitGuardian Security Checks"] },
+            ];
+
+            const { owner, repo } = context.repo;
+            const ref = context.sha;
+
+            const checkRuns = await github.paginate(
+              github.rest.checks.listForRef,
+              {
+                owner,
+                repo,
+                ref,
+                per_page: 100,
+              },
+              (response) => response.data.check_runs,
+            );
+
+            const normalizeConclusion = (run) => {
+              if (!run) {
+                return "not_found";
+              }
+
+              if (run.status !== "completed") {
+                return run.status;
+              }
+
+              return run.conclusion || "unknown";
+            };
+
+            const iconFor = (conclusion, expected) => {
+              if (conclusion === "success") {
+                return "PASS";
+              }
+
+              if (conclusion === "failure") {
+                return expected ? "WARN" : "FAIL";
+              }
+
+              if (conclusion === "not_found") {
+                return "INFO";
+              }
+
+              if (conclusion === "queued" || conclusion === "in_progress") {
+                return "RUN";
+              }
+
+              return "INFO";
+            };
+
+            const rows = scannerTargets.map((target) => {
+              const run = checkRuns.find((candidate) =>
+                target.matchers.some((matcher) => candidate.name.includes(matcher)),
+              );
+
+              const conclusion = normalizeConclusion(run);
+              const expected = Boolean(
+                run && expectedPatterns.some((pattern) => run.name.includes(pattern)),
+              );
+
+              let notes = "Security gate signal collected.";
+              if (!run) {
+                notes = "Check run not found for this commit. Review workflow configuration.";
+              } else if (conclusion === "failure" && expected) {
+                notes = "Expected baseline failure for intentionally vulnerable training target.";
+              } else if (conclusion === "failure") {
+                notes = "Unexpected failure. Investigate and remediate before release.";
+              } else if (conclusion === "queued" || conclusion === "in_progress") {
+                notes = "Check still running when report was generated.";
+              }
+
+              return {
+                scanner: target.label,
+                runName: run ? run.name : "(missing)",
+                status: iconFor(conclusion, expected),
+                conclusion,
+                detailsUrl: run ? run.html_url : "",
+                notes,
+              };
+            });
+
+            const timestamp = new Date().toISOString();
+            const reportTitle = process.env.REPORT_NAME;
+            const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
+            const branchName = process.env.GITHUB_REF_NAME;
+
+            const lines = [];
+            lines.push(`# ${reportTitle}`);
+            lines.push("");
+            lines.push(`- Repository: ${owner}/${repo}`);
+            lines.push(`- Branch: ${branchName}`);
+            lines.push(`- Commit: ${context.sha}`);
+            lines.push(`- Workflow run: ${runUrl}`);
+            lines.push(`- Generated at (UTC): ${timestamp}`);
+            lines.push("");
+            lines.push("## Scanner Status Overview");
+            lines.push("");
+            lines.push("| Scanner | Status | Conclusion | Check Run | Notes |");
+            lines.push("|---|---|---|---|---|");
+
+            for (const row of rows) {
+              const checkRunDisplay = row.detailsUrl
+                ? `[${row.runName}](${row.detailsUrl})`
+                : row.runName;
+              lines.push(
+                `| ${row.scanner} | ${row.status} | ${row.conclusion} | ${checkRunDisplay} | ${row.notes} |`,
+              );
+            }
+
+            lines.push("");
+            lines.push("## Baseline Interpretation");
+            lines.push("");
+            lines.push("- WARN rows marked as expected baseline failures are currently accepted for this capstone stage.");
+            lines.push("- FAIL rows indicate unexpected blocking issues requiring remediation.");
+            lines.push("- PASS rows indicate the corresponding scanner/check succeeded.");
+
+            const reportBody = `${lines.join("\n")}\n`;
+            const reportPath = "security-feedback-report.md";
+
+            fs.writeFileSync(reportPath, reportBody, "utf-8");
+
+            core.setOutput("report_path", reportPath);
+            core.setOutput("report_body", reportBody);
+
+      - name: Upload security report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: ${{ steps.build_report.outputs.report_path }}
+          if-no-files-found: error
+
+      - name: Publish GitHub Step Summary
+        run: cat "${{ steps.build_report.outputs.report_path }}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Broadcast report as PR comment
+        if: ${{ inputs.post_pr_comment && inputs.pr_number != '' }}
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+          REPORT_BODY: ${{ steps.build_report.outputs.report_body }}
+        with:
+          script: |
+            const marker = "<!-- phase4-security-feedback-report -->";
+            const issueNumber = Number(process.env.PR_NUMBER);
+            const body = `${marker}\n${process.env.REPORT_BODY}`;
+
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                per_page: 100,
+              },
+              (response) => response.data,
+            );
+
+            const existingComment = comments.find((comment) =>
+              comment.user &&
+              comment.user.login === "github-actions[bot]" &&
+              comment.body &&
+              comment.body.includes(marker),
+            );
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body,
+              });
+              core.info(`Updated existing security feedback comment (${existingComment.id}).`);
+            } else {
+              const created = await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+                body,
+              });
+              core.info(`Created new security feedback comment (${created.data.id}).`);
+            }
