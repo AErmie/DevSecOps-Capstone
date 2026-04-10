@@ -107,13 +107,16 @@ def test_upload_file():
     assert response.json() == {"message": "File uploaded successfully"}
 
 
-def test_secure_data_with_valid_token():
+def test_secure_data_with_valid_token(monkeypatch):
     """
     Test the `/secure-data` endpoint with a valid token.
 
     Sends a valid token and ensures the secure data is returned.
+    The secret value is injected via environment variable to avoid
+    hardcoded credentials in the test suite.
     """
-    response = client.get("/secure-data", params={"token": "1234567890"})
+    monkeypatch.setenv("API_SECRET", "test-api-secret")
+    response = client.get("/secure-data", params={"token": "test-api-secret"})
     assert response.status_code == 200
     assert response.json() == {"data": "Sensitive Data"}
 

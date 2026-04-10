@@ -125,7 +125,12 @@ celerybeat.pid
 
 # Environments
 .env
+.env.local
+.env.*.local
 .venv
+
+# Test artefacts
+uploaded_file
 env/
 venv/
 ENV/

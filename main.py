@@ -7,13 +7,12 @@ weak authentication mechanisms. The purpose is to highlight vulnerabilities
 for educational purposes.
 """
 
+import os
+
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 app = FastAPI()
-
-# Example of hardcoded secrets
-API_SECRET = "1234567890"
 
 
 @app.get("/")
@@ -128,7 +127,7 @@ def secure_data(token: str = Query(...)):
     Returns:
         dict: The secure data if the token is valid, or an error message if not.
     """
-    if token == API_SECRET:
+    if token == os.getenv("API_SECRET", "secret-not-set"):
         return {"data": "Sensitive Data"}
 
     return JSONResponse(status_code=403, content={"message": "Forbidden"})

@@ -1,0 +1,37 @@
+# GitLeaks configuration for DevSecOps-Capstone
+# Policy: block new secrets on every commit; historical findings (pre-Phase 3)
+# are acknowledged via path/regex allowlists rather than forcing a history rewrite.
+
+title = "DevSecOps-Capstone GitLeaks policy"
+
+[extend]
+# Extend the default GitLeaks ruleset so we inherit all built-in rules.
+useDefault = true
+
+[[rules]]
+id          = "generic-api-key-demo"
+description = "Intentional demo API_SECRET assignment in application code"
+regex       = '''API_SECRET\s*=\s*["'][^"']+["']'''
+entropy     = 0
+tags        = ["demo", "intentional"]
+
+  [rules.allowlist]
+  description = "Allow the intentional demo assignment in main.py only"
+  paths       = ['''main\.py''']
+
+[allowlist]
+description = "Repo-wide allowlist for test fixtures and known historical findings"
+
+# The literal value that was the historical hardcoded secret.
+# Allowing the VALUE means the scanner won't block commits that reference it
+# inside test parameters, documentation, or migration comments.
+regexes = [
+  '''token.*1234567890''',
+  '''params.*1234567890''',
+]
+
+# Files where credential-pattern matches are expected and intentional.
+paths = [
+  '''tests/test_main\.py''',
+  '''\.gitleaks\.toml''',
+]
