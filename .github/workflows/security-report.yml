@@ -88,7 +88,11 @@ jobs:
             ];
 
             const { owner, repo } = context.repo;
-            const ref = context.sha;
+            const reportRef =
+              context.eventName === "pull_request" &&
+              context.payload?.pull_request?.head?.sha
+                ? context.payload.pull_request.head.sha
+                : context.sha;
             const waitForCodeQL = String(process.env.WAIT_FOR_CODEQL || "true").toLowerCase() === "true";
             const waitTimeoutMinutes = Number(process.env.CODEQL_WAIT_TIMEOUT_MINUTES || 8);
             const pollIntervalSeconds = Number(process.env.CODEQL_POLL_INTERVAL_SECONDS || 10);
@@ -99,7 +103,7 @@ jobs:
                 {
                   owner,
                   repo,
-                  ref,
+                  ref: reportRef,
                   per_page: 100,
                 },
                 (response) => response.data.check_runs,
@@ -251,7 +255,7 @@ jobs:
             const timestamp = new Date().toISOString();
             const reportTitle = process.env.REPORT_NAME;
             const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
-            const branchName = process.env.GITHUB_REF_NAME;
+            const branchName = process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME;
             const unexpectedFailures = rows.filter(
               (row) => row.conclusion === "failure" && !row.notes.includes("Expected baseline failure"),
             );
@@ -269,7 +273,7 @@ jobs:
             lines.push("");
             lines.push(`- Repository: ${owner}/${repo}`);
             lines.push(`- Branch: ${branchName}`);
-            lines.push(`- Commit: ${context.sha}`);
+            lines.push(`- Commit: ${reportRef}`);
             lines.push(`- Workflow run: ${runUrl}`);
             lines.push(`- Generated at (UTC): ${timestamp}`);
             lines.push(`- Release readiness: ${releaseReady ? "READY" : "BLOCKED"}`);
