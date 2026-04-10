@@ -54,3 +54,4 @@ jobs:
           pr_number: ${{ github.event.pull_request.number }}
           source_sha: ${{ github.event.pull_request.head.sha }}
           fallback_sha: ${{ github.sha }}
+          wait_for_codeql: false
