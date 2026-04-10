@@ -152,13 +152,15 @@ jobs:
                 (response) => response.data.jobs,
               );
 
-              return jobs.map((job) => ({
+              return (jobs || [])
+                .filter((job) => job && typeof job.id !== "undefined")
+                .map((job) => ({
                 id: job.id,
                 name: job.name,
                 status: job.status,
                 conclusion: job.conclusion,
                 html_url: job.html_url,
-              }));
+                }));
             };
 
             const fetchCheckRuns = async () => {
