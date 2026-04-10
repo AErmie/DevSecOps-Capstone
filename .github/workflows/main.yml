@@ -9,7 +9,6 @@ permissions:
   contents: read
   security-events: write
   actions: read
-  checks: read
   id-token: write
   packages: write
 
@@ -35,6 +34,10 @@ jobs:
 
   security-feedback-report:
     if: always()
+    permissions:
+      contents: read
+      actions: read
+      checks: read
     needs:
       - secret-scan
       - build-image

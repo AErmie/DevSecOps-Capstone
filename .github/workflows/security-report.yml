@@ -133,6 +133,14 @@ jobs:
                 return expected ? "WARN" : "FAIL";
               }
 
+               if (conclusion === "skipped") {
+                return "SKIP";
+              }
+
+              if (conclusion === "neutral") {
+                return "NEUTRAL";
+              }
+
               if (conclusion === "not_found") {
                 return "INFO";
               }
@@ -166,6 +174,14 @@ jobs:
 
               if (conclusions.some((conclusion) => failureConclusions.includes(conclusion))) {
                 return "failure";
+              }
+
+              if (conclusions.some((conclusion) => conclusion === "skipped")) {
+                return "skipped";
+              }
+
+              if (conclusions.some((conclusion) => conclusion === "neutral")) {
+                return "neutral";
               }
 
               if (conclusions.every((conclusion) => conclusion === "success")) {
@@ -231,6 +247,10 @@ jobs:
                 notes = "Expected baseline failure for intentionally vulnerable training target.";
               } else if (conclusion === "failure") {
                 notes = "Unexpected failure. Investigate and remediate before release.";
+              } else if (conclusion === "skipped") {
+                notes = "Check was skipped (often due to upstream dependency failure or job conditions).";
+              } else if (conclusion === "neutral") {
+                notes = "Check completed with a neutral conclusion (no pass/fail gate signal).";
               } else if (conclusion === "queued" || conclusion === "in_progress") {
                 notes = "Check still running when report was generated.";
               }
@@ -266,7 +286,14 @@ jobs:
             const stillRunning = rows.filter(
               (row) => row.conclusion === "queued" || row.conclusion === "in_progress",
             );
-            const releaseReady = unexpectedFailures.length === 0 && stillRunning.length === 0;
+            const skippedChecks = rows.filter((row) => row.conclusion === "skipped");
+            const neutralChecks = rows.filter((row) => row.conclusion === "neutral");
+            const releaseReady =
+              unexpectedFailures.length === 0 &&
+              stillRunning.length === 0 &&
+              missingChecks.length === 0 &&
+              skippedChecks.length === 0 &&
+              (!waitForCodeQL || !codeqlWaitTimedOut);
 
             const lines = [];
             lines.push(`# ${reportTitle}`);
@@ -281,7 +308,7 @@ jobs:
               `- CodeQL wait policy: ${waitForCodeQL ? `enabled (timeout reached: ${codeqlWaitTimedOut ? "yes" : "no"})` : "disabled"}`,
             );
             lines.push(
-              `- Report totals: ${rows.length} checks, ${unexpectedFailures.length} unexpected failures, ${expectedFailures.length} expected baseline failures, ${stillRunning.length} still running, ${missingChecks.length} missing`,
+              `- Report totals: ${rows.length} checks, ${unexpectedFailures.length} unexpected failures, ${expectedFailures.length} expected baseline failures, ${stillRunning.length} still running, ${missingChecks.length} missing, ${skippedChecks.length} skipped, ${neutralChecks.length} neutral`,
             );
             lines.push("");
             lines.push("## Scanner Status Overview");
@@ -303,6 +330,8 @@ jobs:
             lines.push("- PASS rows indicate the corresponding scanner/check succeeded.");
             lines.push("- INFO rows indicate missing check runs and should be treated as a workflow configuration signal.");
             lines.push("- RUN rows indicate checks still in progress at report generation time.");
+            lines.push("- SKIP rows indicate checks skipped due to workflow conditions/dependencies and should be reviewed before release.");
+            lines.push("- NEUTRAL rows indicate checks completed without a strict pass/fail result.");
 
             const reportBody = `${lines.join("\n")}\n`;
             const reportPath = "security-feedback-report.md";
@@ -325,7 +354,7 @@ jobs:
   security-feedback-pr-comment:
     name: Broadcast Security Feedback PR Comment
     runs-on: ubuntu-latest
-    if: ${{ inputs.post_pr_comment && inputs.pr_number != '' }}
+    if: ${{ inputs.post_pr_comment && inputs.pr_number != '' && github.event.pull_request.head.repo.full_name == github.repository }}
     needs:
       - security-feedback-report
     permissions:
