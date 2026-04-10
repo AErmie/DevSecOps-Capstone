@@ -159,6 +159,8 @@ jobs:
                 (response) => response.data.jobs,
               );
 
+              core.info(`Collected ${jobs.length} workflow jobs from run ${workflowRunId}.`);
+
               return (jobs || [])
                 .filter((job) => job && typeof job.id !== "undefined")
                 .map((job) => ({
@@ -174,6 +176,7 @@ jobs:
               const allRuns = [];
               for (const ref of candidateRefs) {
                 const refRuns = await fetchCheckRunsForRef(ref);
+                core.info(`Collected ${refRuns.length} check-runs for ref ${ref}.`);
                 allRuns.push(...refRuns);
               }
 
@@ -214,6 +217,8 @@ jobs:
             const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
             let checkRuns = await fetchCheckRuns();
+            core.info(`Total collected run signals: ${checkRuns.length}`);
+            core.info(`Sample run names: ${checkRuns.slice(0, 15).map((run) => run.name).join(" | ")}`);
 
             const iconFor = (conclusion, expected) => {
               if (conclusion === "success") {
