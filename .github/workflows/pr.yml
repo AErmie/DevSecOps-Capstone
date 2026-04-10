@@ -2,10 +2,10 @@ name: PR Workflow
 on:
   pull_request:
     types:
-      - opened
-      - edited
-      - synchronize
-      - reopened
+    - opened
+    - edited
+    - synchronize
+    - reopened
 
 concurrency:
   group: pr-${{ github.event.pull_request.number }}
@@ -15,7 +15,6 @@ permissions:
   contents: read
   security-events: write
   actions: read
-  checks: read
 
 jobs:
     secret-scan:
@@ -52,6 +51,7 @@ jobs:
           artifact_name: pr-security-feedback-report
           post_pr_comment: true
           pr_number: ${{ github.event.pull_request.number }}
+          head_repo_full_name: ${{ github.event.pull_request.head.repo.full_name }}
           source_sha: ${{ github.event.pull_request.head.sha }}
           fallback_sha: ${{ github.sha }}
           wait_for_codeql: false

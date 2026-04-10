@@ -38,6 +38,16 @@ on:
         required: false
         type: string
         default: ""
+      head_repo_full_name:
+        description: Full name of the PR head repository for fork-safe comment posting.
+        required: false
+        type: string
+        default: ""
+      include_gitguardian:
+        description: Whether to include GitGuardian check in report and readiness gating.
+        required: false
+        type: boolean
+        default: false
       wait_for_codeql:
         description: Wait for CodeQL check runs to complete before finalizing the report.
         required: false
@@ -76,6 +86,7 @@ jobs:
         env:
           REPORT_NAME: ${{ inputs.report_name }}
           EXPECTED_BASELINE_CHECKS: ${{ inputs.expected_baseline_checks }}
+          INCLUDE_GITGUARDIAN: ${{ inputs.include_gitguardian }}
           WAIT_FOR_CODEQL: ${{ inputs.wait_for_codeql }}
           CODEQL_WAIT_TIMEOUT_MINUTES: ${{ inputs.codeql_wait_timeout_minutes }}
           CODEQL_POLL_INTERVAL_SECONDS: ${{ inputs.codeql_poll_interval_seconds }}
@@ -96,8 +107,12 @@ jobs:
               { label: "Trivy SCA", matchers: ["Run Trivy security scanner", "Trivy"] },
               { label: "OWASP ZAP DAST", matchers: ["Run OWASP ZAP DAST scan", "OWASP ZAP"] },
               { label: "CodeQL", matchers: ["CodeQL Analysis", "CodeQL"] },
-              { label: "GitGuardian", matchers: ["GitGuardian Security Checks"] },
             ];
+
+            const includeGitGuardian = String(process.env.INCLUDE_GITGUARDIAN || "false").toLowerCase() === "true";
+            if (includeGitGuardian) {
+              scannerTargets.push({ label: "GitGuardian", matchers: ["GitGuardian Security Checks"] });
+            }
 
             const { owner, repo } = context.repo;
             const requestedSourceSha = (process.env.SOURCE_SHA || "").trim();
@@ -313,18 +328,19 @@ jobs:
             const reportTitle = process.env.REPORT_NAME;
             const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
             const branchName = process.env.GITHUB_HEAD_REF || process.env.GITHUB_REF_NAME;
-            const unexpectedFailures = rows.filter(
+            const gatingRows = rows.filter((row) => waitForCodeQL || row.scanner !== "CodeQL");
+            const unexpectedFailures = gatingRows.filter(
               (row) => row.conclusion === "failure" && !row.notes.includes("Expected baseline failure"),
             );
-            const expectedFailures = rows.filter(
+            const expectedFailures = gatingRows.filter(
               (row) => row.conclusion === "failure" && row.notes.includes("Expected baseline failure"),
             );
-            const missingChecks = rows.filter((row) => row.conclusion === "not_found");
-            const stillRunning = rows.filter(
+            const missingChecks = gatingRows.filter((row) => row.conclusion === "not_found");
+            const stillRunning = gatingRows.filter(
               (row) => row.conclusion === "queued" || row.conclusion === "in_progress",
             );
-            const skippedChecks = rows.filter((row) => row.conclusion === "skipped");
-            const neutralChecks = rows.filter((row) => row.conclusion === "neutral");
+            const skippedChecks = gatingRows.filter((row) => row.conclusion === "skipped");
+            const neutralChecks = gatingRows.filter((row) => row.conclusion === "neutral");
             const releaseReady =
               unexpectedFailures.length === 0 &&
               stillRunning.length === 0 &&
@@ -344,6 +360,9 @@ jobs:
             lines.push(
               `- CodeQL wait policy: ${waitForCodeQL ? `enabled (timeout reached: ${codeqlWaitTimedOut ? "yes" : "no"})` : "disabled"}`,
             );
+            if (!waitForCodeQL) {
+              lines.push("- Readiness note: CodeQL is excluded from readiness gating because wait_for_codeql=false.");
+            }
             lines.push(
               `- Report totals: ${rows.length} checks, ${unexpectedFailures.length} unexpected failures, ${expectedFailures.length} expected baseline failures, ${stillRunning.length} still running, ${missingChecks.length} missing, ${skippedChecks.length} skipped, ${neutralChecks.length} neutral`,
             );
@@ -391,7 +410,7 @@ jobs:
   security-feedback-pr-comment:
     name: Broadcast Security Feedback PR Comment
     runs-on: ubuntu-latest
-    if: ${{ inputs.post_pr_comment && inputs.pr_number != '' && github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ inputs.post_pr_comment && inputs.pr_number != '' && (inputs.head_repo_full_name == '' || inputs.head_repo_full_name == github.repository) }}
     needs:
       - security-feedback-report
     permissions:
