@@ -36,3 +36,8 @@ repos:
     hooks:
       - id: markdownlint-cli2
         args: [--config=.markdownlint.yaml, "**/*.md", "!node_modules/**"]
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.24.3
+    hooks:
+      - id: gitleaks

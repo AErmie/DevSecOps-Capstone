@@ -13,8 +13,12 @@ permissions:
   packages: write
 
 jobs:
+  secret-scan:
+    uses: ./.github/workflows/gitleaks.yml
+
   build-image:
     uses: ./.github/workflows/build-image.yml
+    needs: secret-scan
 
   lint-format:
     uses: ./.github/workflows/lint-format.yml

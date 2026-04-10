@@ -1,0 +1,21 @@
+# GitLeaks configuration for DevSecOps-Capstone
+# Policy: block new secrets on every commit; the single pre-Phase 3 commit
+# that introduced the intentional demo secret is acknowledged by commit SHA
+# so no history rewrite is required and no literal secret value is stored in-repo.
+
+title = "DevSecOps-Capstone GitLeaks policy"
+
+[extend]
+# Extend the default GitLeaks ruleset so we inherit all built-in rules.
+useDefault = true
+
+[allowlist]
+description = "Pre-Phase 3 baseline commit — intentional demo secret introduced before remediation"
+
+# Allow by commit SHA rather than by literal value or file path.
+# This keeps the allowlist narrowly scoped: only the exact commit that
+# introduced the historical hardcoded credential is skipped; every subsequent
+# commit (including this one and all future commits) is fully scanned.
+commits = [
+  "c831344d23a47dc35613a5405a9787b6078d0f8f",
+]

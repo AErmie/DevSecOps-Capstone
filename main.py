@@ -7,13 +7,12 @@ weak authentication mechanisms. The purpose is to highlight vulnerabilities
 for educational purposes.
 """
 
+import os
+
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 app = FastAPI()
-
-# Example of hardcoded secrets
-API_SECRET = "1234567890"
 
 
 @app.get("/")
@@ -119,16 +118,23 @@ def secure_data(token: str = Query(...)):
     """
     Endpoint to access secure data.
 
-    Demonstrates improper authentication by using a hardcoded secret and
-    lack of token validation mechanisms.
+    Demonstrates environment-based secret injection for authentication.
+    Access is fail-closed when API_SECRET is not configured.
 
     Args:
         token (str): The token provided in the query parameter.
 
     Returns:
-        dict: The secure data if the token is valid, or an error message if not.
+        dict: The secure data when the token matches API_SECRET.
+
+    Raises:
+        HTTPException: If API_SECRET is not configured in the runtime environment.
     """
-    if token == API_SECRET:
+    api_secret = os.getenv("API_SECRET")
+    if not api_secret:
+        raise HTTPException(status_code=503, detail="API secret is not configured")
+
+    if token == api_secret:
         return {"data": "Sensitive Data"}
 
     return JSONResponse(status_code=403, content={"message": "Forbidden"})

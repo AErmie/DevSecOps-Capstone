@@ -110,7 +110,12 @@ jobs:
 
           echo "Skyline target failed readiness checks."
           docker ps -a
-          docker logs skyline-dast-target || true
+          # Emit last 50 lines of application stdout for diagnostics.
+          # Pipe through grep -Ev to strip any lines that look like key=value
+          # pairs so that environment variables injected into the container
+          # are not echoed into the public CI log.
+          docker logs --tail 50 skyline-dast-target 2>&1 \
+            | grep -Ev '^[[:space:]]*[A-Z_]+=.+' || true
           exit 1
 
       - name: Confirm application endpoints are reachable

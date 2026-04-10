@@ -107,23 +107,42 @@ def test_upload_file():
     assert response.json() == {"message": "File uploaded successfully"}
 
 
-def test_secure_data_with_valid_token():
+def test_secure_data_with_valid_token(monkeypatch):
     """
     Test the `/secure-data` endpoint with a valid token.
 
     Sends a valid token and ensures the secure data is returned.
+    The secret value is injected via environment variable to avoid
+    hardcoded credentials in the test suite.
     """
-    response = client.get("/secure-data", params={"token": "1234567890"})
+    monkeypatch.setenv("API_SECRET", "test-api-secret")
+    response = client.get("/secure-data", params={"token": "test-api-secret"})
     assert response.status_code == 200
     assert response.json() == {"data": "Sensitive Data"}
 
 
-def test_secure_data_with_invalid_token():
+def test_secure_data_with_invalid_token(monkeypatch):
     """
     Test the `/secure-data` endpoint with an invalid token.
 
     Sends an invalid token and ensures a 403 Forbidden status code is returned.
+    API_SECRET is set via monkeypatch so the endpoint is reachable (not 503),
+    and the supplied token intentionally does not match it.
     """
+    monkeypatch.setenv("API_SECRET", "test-api-secret")
     response = client.get("/secure-data", params={"token": "wrong_token"})
     assert response.status_code == 403
     assert response.json() == {"message": "Forbidden"}
+
+
+def test_secure_data_without_configured_secret(monkeypatch):
+    """
+    Test the `/secure-data` endpoint when API_SECRET is not configured.
+
+    Ensures the endpoint fails closed with a 503 instead of accepting
+    any default token value.
+    """
+    monkeypatch.delenv("API_SECRET", raising=False)
+    response = client.get("/secure-data", params={"token": "any-token"})
+    assert response.status_code == 503
+    assert response.json() == {"detail": "API secret is not configured"}

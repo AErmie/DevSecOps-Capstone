@@ -57,6 +57,52 @@ The repository now runs DAST automatically after the application is effectively
 deployed inside a temporary CI container, proving that the live runtime gates
 are checked and can block unsafe changes.
 
+## Phase 3: Locking the Vault (Secrets & Config)
+
+Phase 3 eliminates the hardcoded credential that has been present since the
+initial commit and adds automated guardrails that prevent new secrets from
+ever reaching the repository.
+
+### What changed
+
+- **`main.py`**: `API_SECRET` is no longer a module-level constant.  The
+  `/secure-data` endpoint now reads `os.getenv("API_SECRET")` at request time so
+  that the value is injected by the runtime environment, not baked into source.
+- **`tests/test_main.py`**: The corresponding test switches from a hardcoded
+  token literal to `monkeypatch.setenv` so the test fixture never commits a
+  credential of its own.
+- **GitHub Actions — `gitleaks.yml`**: New reusable workflow that runs a full
+  `gitleaks/gitleaks-action@v2` scan with `fetch-depth: 0` (full history) on
+  every PR and push.
+- **`pr.yml` / `main.yml`**: Both orchestrators call the new `secret-scan` job
+  and gate `build-image` on it (`needs: secret-scan`).  A leak blocks the
+  pipeline before a single build artefact is created.
+- **`.gitleaks.toml`**: GitLeaks policy file that extends the built-in ruleset
+  and adds a narrowly scoped allowlist for historical test-fixture references
+  that predate this phase.
+- **`.pre-commit-config.yaml`**: GitLeaks hook added so developers are warned
+  about leaks at commit time, before code ever reaches GitHub.
+- **`unit-sec-test.yml`**: The `docker logs` diagnostic command is now filtered
+  through `grep -Ev` to strip `KEY=value` lines so container environment
+  variables are never echoed into the public CI log.
+
+### Phase 3 Flow
+
+1. Developer commits → pre-commit GitLeaks hook fires locally.
+2. PR opened → `secret-scan` job runs; `build-image` only starts after it passes.
+3. If any new secret is found, the job exits non-zero and the PR is blocked.
+4. Secrets required at runtime (e.g., `API_SECRET`) are stored as GitHub
+   Encrypted Secrets and injected as environment variables; they never appear
+   in source code or CI logs.
+
+### Phase 3 Milestone Outcome
+
+Every commit path — local pre-commit and GitHub Actions — now runs a secret
+scan.  The pipeline blocks on any new credential leakage, and the existing
+codebase has been remediated so that no plaintext secret remains in the
+current working tree.  Historical findings are acknowledged by commit SHA in
+`.gitleaks.toml`; no literal credential value is stored in any tracked file.
+
 ## Local Validation
 
 Use these commands before opening a pull request:
