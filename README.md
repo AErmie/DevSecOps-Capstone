@@ -10,7 +10,7 @@ This repository implements Phase 1 gates in GitHub Actions to block vulnerable c
 
 - SAST: Semgrep runs with `p/security-audit` and `p/python` rule packs.
 - SAST: CodeQL runs as a dedicated workflow and enforces a high-severity alert gate.
-- SCA: Trivy scans the built Docker image for OS and library vulnerabilities.
+- SCA: Trivy scans third-party libraries and fails on high/critical dependency vulnerabilities.
 
 ### Triggers
 
