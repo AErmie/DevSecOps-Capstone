@@ -28,6 +28,12 @@ This repository implements Phase 1 gates in GitHub Actions to block vulnerable c
 
 Any pull request or push containing high-severity security risk fails CI and must be remediated before proceeding.
 
+### Phase 1 Status
+
+- Implemented: SAST (Semgrep + CodeQL) and SCA (Trivy library scan) gates are active in GitHub Actions.
+- Implemented: High/Critical policy is enforced as a hard fail in CI.
+- Current validation behavior: this intentionally vulnerable baseline triggers Trivy findings (for example `h11`, `starlette`, `black`) at HIGH/CRITICAL severity, so the PR security gate fails as expected until vulnerabilities are remediated.
+
 ## Local Validation
 
 Use these commands before opening a pull request:
