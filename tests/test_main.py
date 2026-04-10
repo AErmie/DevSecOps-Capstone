@@ -133,3 +133,16 @@ def test_secure_data_with_invalid_token(monkeypatch):
     response = client.get("/secure-data", params={"token": "wrong_token"})
     assert response.status_code == 403
     assert response.json() == {"message": "Forbidden"}
+
+
+def test_secure_data_without_configured_secret(monkeypatch):
+    """
+    Test the `/secure-data` endpoint when API_SECRET is not configured.
+
+    Ensures the endpoint fails closed with a 503 instead of accepting
+    any default token value.
+    """
+    monkeypatch.delenv("API_SECRET", raising=False)
+    response = client.get("/secure-data", params={"token": "any-token"})
+    assert response.status_code == 503
+    assert response.json() == {"detail": "API secret is not configured"}
