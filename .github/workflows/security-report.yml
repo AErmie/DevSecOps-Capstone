@@ -115,14 +115,20 @@ jobs:
               return "INFO";
             };
 
+            const safeCheckRuns = checkRuns.filter(
+              (candidate) => candidate && typeof candidate.name === "string",
+            );
+
             const rows = scannerTargets.map((target) => {
-              const run = checkRuns.find((candidate) =>
+              const run = safeCheckRuns.find((candidate) =>
                 target.matchers.some((matcher) => candidate.name.includes(matcher)),
               );
 
+              const runName = run && typeof run.name === "string" ? run.name : "";
+
               const conclusion = normalizeConclusion(run);
               const expected = Boolean(
-                run && expectedPatterns.some((pattern) => run.name.includes(pattern)),
+                run && expectedPatterns.some((pattern) => runName.includes(pattern)),
               );
 
               let notes = "Security gate signal collected.";
@@ -138,7 +144,7 @@ jobs:
 
               return {
                 scanner: target.label,
-                runName: run ? run.name : "(missing)",
+                runName: runName || "(missing)",
                 status: iconFor(conclusion, expected),
                 conclusion,
                 detailsUrl: run ? run.html_url : "",
