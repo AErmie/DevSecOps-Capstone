@@ -107,7 +107,19 @@ jobs:
               { label: "GitGuardian", matchers: ["GitGuardian Security Checks"] },
             ];
 
-            const { owner, repo } = context.repo;
+            // Use explicit owner/repo from context instead of context.repo which may not be set in reusable workflows
+            let owner = github.context.repo.owner;
+            let repo = github.context.repo.repo;
+            
+            // Fallback for old github object format
+            if (!owner || !repo) {
+              const match = context.payload.repository?.full_name?.split('/') || [];
+              owner = owner || match[0] || context.actor;
+              repo = repo || match[1] || 'DevSecOps-Capstone';
+            }
+
+            core.info(`DEBUG: Using owner='${owner}', repo='${repo}'`);
+
             const requestedSourceSha = (process.env.SOURCE_SHA || "").trim();
             const requestedFallbackSha = (process.env.FALLBACK_SHA || "").trim();
             const reportRef = requestedSourceSha || context.sha;
