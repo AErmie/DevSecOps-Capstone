@@ -159,7 +159,14 @@ jobs:
 
             const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+            core.info(`DEBUG: requestedSourceSha=${requestedSourceSha}`);
+            core.info(`DEBUG: requestedFallbackSha=${requestedFallbackSha}`);
+            core.info(`DEBUG: context.sha=${context.sha}`);
+            core.info(`DEBUG: candidateRefs=${JSON.stringify(candidateRefs)}`);
+
             let checkRuns = await fetchCheckRuns();
+
+            core.info(`DEBUG: fetched ${checkRuns.length} check runs`);
 
             const iconFor = (conclusion, expected) => {
               if (conclusion === "success") {
