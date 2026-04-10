@@ -27,6 +27,17 @@ def index():
     return {"message": "Hello World!"}
 
 
+@app.get("/health")
+def health_check():
+    """
+    Lightweight readiness endpoint for CI and container health probing.
+
+    Returns:
+        dict: A JSON object indicating that the application is ready.
+    """
+    return {"status": "ok"}
+
+
 @app.get("/users")
 def get_user(username: str):
     """

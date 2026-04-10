@@ -11,6 +11,7 @@ This repository implements Phase 1 gates in GitHub Actions to block vulnerable c
 - SAST: Semgrep runs with `p/security-audit` and `p/python` rule packs.
 - SAST: CodeQL runs as a dedicated workflow and enforces a high-severity alert gate.
 - SCA: Trivy scans third-party libraries and fails on high/critical dependency vulnerabilities.
+- DAST: OWASP ZAP launches against the live API after the container is started inside CI.
 
 ### Triggers
 
@@ -23,6 +24,7 @@ This repository implements Phase 1 gates in GitHub Actions to block vulnerable c
 - Semgrep fails the build on `ERROR` findings.
 - CodeQL fails the build when open high/critical alerts are detected for the current ref.
 - Trivy fails the build on `HIGH` and `CRITICAL` vulnerabilities.
+- OWASP ZAP fails the build when runtime alerts are detected against the live target.
 
 ### Milestone Outcome
 
@@ -37,6 +39,24 @@ Any pull request or push containing high-severity security risk fails CI and mus
   severity, so the PR security gate fails as expected until vulnerabilities are
   remediated.
 
+## Phase 2: The Stress Test (DAST)
+
+Phase 2 extends the pipeline with a live DAST gate that exercises the running
+Skyline API rather than only scanning source code or dependencies.
+
+### Phase 2 Flow
+
+- GitHub Actions builds the container image and starts the API in an isolated CI job.
+- The workflow waits for `http://127.0.0.1:8080/health` to report ready.
+- OWASP ZAP scans the live OpenAPI target at `http://127.0.0.1:8080/openapi.json`.
+- The DAST job blocks downstream execution if ZAP finds runtime issues.
+
+### Phase 2 Milestone Outcome
+
+The repository now runs DAST automatically after the application is effectively
+deployed inside a temporary CI container, proving that the live runtime gates
+are checked and can block unsafe changes.
+
 ## Local Validation
 
 Use these commands before opening a pull request:
@@ -49,6 +69,16 @@ python -m pylint .
 python -m black --check .
 pre-commit run --all-files
 # Re-run the same command once more to confirm a clean post-fix state.
+```
+
+To exercise the live API locally before pushing, run the container and verify
+the readiness and OpenAPI endpoints:
+
+```bash
+docker build -t python-fastapi:local .
+docker run --rm -p 8080:8080 python-fastapi:local
+curl http://127.0.0.1:8080/health
+curl http://127.0.0.1:8080/openapi.json
 ```
 
 ## Repository Hygiene Files
