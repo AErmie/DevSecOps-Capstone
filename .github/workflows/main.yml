@@ -47,3 +47,4 @@ jobs:
     with:
       report_name: Main Branch Security Feedback Report
       artifact_name: main-security-feedback-report
+      source_sha: ${{ github.sha }}
