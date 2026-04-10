@@ -123,7 +123,7 @@ jobs:
             // Try explicit inputs first
             let owner = (process.env.REPO_OWNER || "").trim() || github.context.repo.owner;
             let repo = (process.env.REPO_NAME || "").trim() || github.context.repo.repo;
-            
+
             // Fallback for old github object format
             if (!owner || !repo) {
               const match = context.payload.repository?.full_name?.split('/') || [];
