@@ -64,6 +64,7 @@ jobs:
             );
 
             const isHighOrCritical = (alert) => {
+              // `security_severity_level` is primary; `severity` is kept as fallback for rule metadata variance.
               const level = String(alert?.rule?.security_severity_level || '').toLowerCase();
               const severity = String(alert?.rule?.severity || '').toLowerCase();
               return level === 'high' || level === 'critical' || severity === 'high' || severity === 'error';
