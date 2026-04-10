@@ -170,6 +170,11 @@ jobs:
                 allRuns.push(...refRuns);
               }
 
+              // Also include jobs from the current workflow run. In some PR contexts,
+              // check-runs for sibling jobs may not be returned consistently by listForRef.
+              const workflowJobRuns = await fetchWorkflowJobsAsCheckRuns();
+              allRuns.push(...workflowJobRuns);
+
               // Dedupe runs across refs by check-run id.
               const deduped = [];
               const seenIds = new Set();
@@ -182,10 +187,8 @@ jobs:
                 deduped.push(run);
               }
 
-              // Fallback to workflow jobs when check-run lookup is empty.
               if (deduped.length === 0) {
-                core.info("No check runs found for candidate refs; falling back to current workflow jobs.");
-                return fetchWorkflowJobsAsCheckRuns();
+                core.info("No scanner signals found from check-runs or workflow jobs.");
               }
 
               return deduped;
