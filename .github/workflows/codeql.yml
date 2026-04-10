@@ -50,17 +50,26 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
             const ref = context.ref;
+            const isPullRequestEvent = context.eventName === 'pull_request';
+            const pullRequestNumber = context.payload?.pull_request?.number;
+
+            const listOptions = {
+              owner,
+              repo,
+              state: 'open',
+              tool_name: 'CodeQL',
+              per_page: 100
+            };
+
+            if (isPullRequestEvent && pullRequestNumber) {
+              listOptions.pr = pullRequestNumber;
+            } else {
+              listOptions.ref = ref;
+            }
 
             const alerts = await github.paginate(
               github.rest.codeScanning.listAlertsForRepo,
-              {
-                owner,
-                repo,
-                ref,
-                state: 'open',
-                tool_name: 'CodeQL',
-                per_page: 100
-              }
+              listOptions
             );
 
             const isHighOrCritical = (alert) => {

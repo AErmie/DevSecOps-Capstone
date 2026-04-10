@@ -35,4 +35,4 @@ repos:
     rev: v0.14.0
     hooks:
       - id: markdownlint-cli2
-        args: ["**/*.md", "!node_modules/**"]
+        args: [--config=.markdownlint.yaml, "**/*.md", "!node_modules/**"]
