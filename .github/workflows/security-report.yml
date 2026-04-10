@@ -83,18 +83,6 @@ jobs:
               (response) => response.data.check_runs,
             );
 
-            const normalizeConclusion = (run) => {
-              if (!run) {
-                return "not_found";
-              }
-
-              if (run.status !== "completed") {
-                return run.status;
-              }
-
-              return run.conclusion || "unknown";
-            };
-
             const iconFor = (conclusion, expected) => {
               if (conclusion === "success") {
                 return "PASS";

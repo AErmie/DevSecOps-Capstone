@@ -12,6 +12,8 @@ permissions:
   security-events: write
   actions: read
   checks: read
+  pull-requests: write
+  issues: write
 
 jobs:
     secret-scan:
