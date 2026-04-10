@@ -18,6 +18,7 @@ jobs:
 
     build-image:
         uses: ./.github/workflows/build-image.yml
+        needs: secret-scan
 
     lint-format:
         uses: ./.github/workflows/lint-format.yml

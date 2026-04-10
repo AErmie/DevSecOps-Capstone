@@ -127,7 +127,11 @@ def secure_data(token: str = Query(...)):
     Returns:
         dict: The secure data if the token is valid, or an error message if not.
     """
-    if token == os.getenv("API_SECRET", "secret-not-set"):
+    api_secret = os.getenv("API_SECRET")
+    if not api_secret:
+        raise HTTPException(status_code=503, detail="API secret is not configured")
+
+    if token == api_secret:
         return {"data": "Sensitive Data"}
 
     return JSONResponse(status_code=403, content={"message": "Forbidden"})

@@ -75,11 +75,12 @@ ever reaching the repository.
   `gitleaks/gitleaks-action@v2` scan with `fetch-depth: 0` (full history) on
   every PR and push.
 - **`pr.yml` / `main.yml`**: Both orchestrators call the new `secret-scan` job
-  in parallel with `build-image`.  A leak blocks the pipeline before a single
-  build artefact is created.
+- **`pr.yml` / `main.yml`**: Both orchestrators call the new `secret-scan` job
+  and gate `build-image` on it (`needs: secret-scan`).  A leak blocks the
+  pipeline before a single build artefact is created.
 - **`.gitleaks.toml`**: GitLeaks policy file that extends the built-in ruleset
-  and adds a targeted allowlist for the intentional demo assignment in `main.py`
-  and the historical test-fixture references that predate this phase.
+  and adds a narrowly scoped allowlist for historical test-fixture references
+  that predate this phase.
 - **`.pre-commit-config.yaml`**: GitLeaks hook added so developers are warned
   about leaks at commit time, before code ever reaches GitHub.
 - **`unit-sec-test.yml`**: The `docker logs` diagnostic command is now filtered
@@ -89,7 +90,7 @@ ever reaching the repository.
 ### Phase 3 Flow
 
 1. Developer commits → pre-commit GitLeaks hook fires locally.
-2. PR opened → `secret-scan` job runs in parallel with the Docker build.
+2. PR opened → `secret-scan` job runs; `build-image` only starts after it passes.
 3. If any new secret is found, the job exits non-zero and the PR is blocked.
 4. Secrets required at runtime (e.g., `API_SECRET`) are stored as GitHub
    Encrypted Secrets and injected as environment variables; they never appear
@@ -99,8 +100,9 @@ ever reaching the repository.
 
 Every commit path — local pre-commit and GitHub Actions — now runs a secret
 scan.  The pipeline blocks on any new credential leakage, and the existing
-codebase has been remediated so that no plaintext secret is present in the
-current working tree.
+codebase has been remediated so that no plaintext secret remains in the
+current working tree.  Historical findings are acknowledged by commit SHA in
+`.gitleaks.toml`; no literal credential value is stored in any tracked file.
 
 ## Local Validation
 
