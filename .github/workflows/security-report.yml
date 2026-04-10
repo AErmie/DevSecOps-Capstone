@@ -33,13 +33,13 @@ permissions:
   contents: read
   actions: read
   checks: read
-  pull-requests: write
-  issues: write
 
 jobs:
   security-feedback-report:
     name: Generate Security Feedback Report
     runs-on: ubuntu-latest
+    outputs:
+      report_body: ${{ steps.build_report.outputs.report_body }}
 
     steps:
       - name: Checkout repository
@@ -115,24 +115,54 @@ jobs:
               return "INFO";
             };
 
+            const aggregateConclusion = (runs) => {
+              if (runs.length === 0) {
+                return "not_found";
+              }
+
+              if (runs.some((run) => run.status !== "completed")) {
+                return runs.some((run) => run.status === "in_progress")
+                  ? "in_progress"
+                  : "queued";
+              }
+
+              const conclusions = runs.map((run) => run.conclusion || "unknown");
+              const failureConclusions = [
+                "failure",
+                "cancelled",
+                "timed_out",
+                "action_required",
+                "stale",
+              ];
+
+              if (conclusions.some((conclusion) => failureConclusions.includes(conclusion))) {
+                return "failure";
+              }
+
+              if (conclusions.every((conclusion) => conclusion === "success")) {
+                return "success";
+              }
+
+              return "unknown";
+            };
+
             const safeCheckRuns = checkRuns.filter(
               (candidate) => candidate && typeof candidate.name === "string",
             );
 
             const rows = scannerTargets.map((target) => {
-              const run = safeCheckRuns.find((candidate) =>
+              const matchingRuns = safeCheckRuns.filter((candidate) =>
                 target.matchers.some((matcher) => candidate.name.includes(matcher)),
               );
 
-              const runName = run && typeof run.name === "string" ? run.name : "";
-
-              const conclusion = normalizeConclusion(run);
-              const expected = Boolean(
-                run && expectedPatterns.some((pattern) => runName.includes(pattern)),
+              const runNames = matchingRuns.map((run) => run.name);
+              const conclusion = aggregateConclusion(matchingRuns);
+              const expected = runNames.some((runName) =>
+                expectedPatterns.some((pattern) => runName.includes(pattern)),
               );
 
               let notes = "Security gate signal collected.";
-              if (!run) {
+              if (matchingRuns.length === 0) {
                 notes = "Check run not found for this commit. Review workflow configuration.";
               } else if (conclusion === "failure" && expected) {
                 notes = "Expected baseline failure for intentionally vulnerable training target.";
@@ -142,12 +172,19 @@ jobs:
                 notes = "Check still running when report was generated.";
               }
 
+              const runLinks = matchingRuns.map((run) => {
+                if (run.html_url) {
+                  return `[${run.name}](${run.html_url})`;
+                }
+
+                return run.name;
+              });
+
               return {
                 scanner: target.label,
-                runName: runName || "(missing)",
+                runName: runLinks.length > 0 ? runLinks.join("<br>") : "(missing)",
                 status: iconFor(conclusion, expected),
                 conclusion,
-                detailsUrl: run ? run.html_url : "",
                 notes,
               };
             });
@@ -172,11 +209,8 @@ jobs:
             lines.push("|---|---|---|---|---|");
 
             for (const row of rows) {
-              const checkRunDisplay = row.detailsUrl
-                ? `[${row.runName}](${row.detailsUrl})`
-                : row.runName;
               lines.push(
-                `| ${row.scanner} | ${row.status} | ${row.conclusion} | ${checkRunDisplay} | ${row.notes} |`,
+                `| ${row.scanner} | ${row.status} | ${row.conclusion} | ${row.runName} | ${row.notes} |`,
               );
             }
 
@@ -205,12 +239,23 @@ jobs:
       - name: Publish GitHub Step Summary
         run: cat "${{ steps.build_report.outputs.report_path }}" >> "$GITHUB_STEP_SUMMARY"
 
+  security-feedback-pr-comment:
+    name: Broadcast Security Feedback PR Comment
+    runs-on: ubuntu-latest
+    if: ${{ inputs.post_pr_comment && inputs.pr_number != '' }}
+    needs:
+      - security-feedback-report
+    permissions:
+      pull-requests: write
+      issues: write
+
+    steps:
+
       - name: Broadcast report as PR comment
-        if: ${{ inputs.post_pr_comment && inputs.pr_number != '' }}
         uses: actions/github-script@v7
         env:
           PR_NUMBER: ${{ inputs.pr_number }}
-          REPORT_BODY: ${{ steps.build_report.outputs.report_body }}
+          REPORT_BODY: ${{ needs.security-feedback-report.outputs.report_body }}
         with:
           script: |
             const marker = "<!-- phase4-security-feedback-report -->";

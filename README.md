@@ -65,7 +65,7 @@ Phase 3 eliminates the hardcoded credential that has been present since the
 initial commit and adds automated guardrails that prevent new secrets from
 ever reaching the repository.
 
-### Reporting Enhancements
+### Secrets and Config Enhancements
 
 - **`main.py`**: `API_SECRET` is no longer a module-level constant.  The
   `/secure-data` endpoint now reads `os.getenv("API_SECRET")` at request time so
