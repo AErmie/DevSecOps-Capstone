@@ -28,6 +28,21 @@ on:
         required: false
         type: string
         default: ""
+      wait_for_codeql:
+        description: Wait for CodeQL check runs to complete before finalizing the report.
+        required: false
+        type: boolean
+        default: true
+      codeql_wait_timeout_minutes:
+        description: Maximum time in minutes to wait for CodeQL check runs.
+        required: false
+        type: number
+        default: 8
+      codeql_poll_interval_seconds:
+        description: Poll interval in seconds while waiting for CodeQL check runs.
+        required: false
+        type: number
+        default: 10
 
 permissions:
   contents: read
@@ -51,6 +66,9 @@ jobs:
         env:
           REPORT_NAME: ${{ inputs.report_name }}
           EXPECTED_BASELINE_CHECKS: ${{ inputs.expected_baseline_checks }}
+          WAIT_FOR_CODEQL: ${{ inputs.wait_for_codeql }}
+          CODEQL_WAIT_TIMEOUT_MINUTES: ${{ inputs.codeql_wait_timeout_minutes }}
+          CODEQL_POLL_INTERVAL_SECONDS: ${{ inputs.codeql_poll_interval_seconds }}
         with:
           script: |
             const fs = require("fs");
@@ -71,17 +89,36 @@ jobs:
 
             const { owner, repo } = context.repo;
             const ref = context.sha;
+            const waitForCodeQL = String(process.env.WAIT_FOR_CODEQL || "true").toLowerCase() === "true";
+            const waitTimeoutMinutes = Number(process.env.CODEQL_WAIT_TIMEOUT_MINUTES || 8);
+            const pollIntervalSeconds = Number(process.env.CODEQL_POLL_INTERVAL_SECONDS || 10);
 
-            const checkRuns = await github.paginate(
-              github.rest.checks.listForRef,
-              {
-                owner,
-                repo,
-                ref,
-                per_page: 100,
-              },
-              (response) => response.data.check_runs,
-            );
+            const fetchCheckRuns = async () => {
+              return github.paginate(
+                github.rest.checks.listForRef,
+                {
+                  owner,
+                  repo,
+                  ref,
+                  per_page: 100,
+                },
+                (response) => response.data.check_runs,
+              );
+            };
+
+            const getMatchingRuns = (allRuns, target) => {
+              const safeRuns = allRuns.filter(
+                (candidate) => candidate && typeof candidate.name === "string",
+              );
+
+              return safeRuns.filter((candidate) =>
+                target.matchers.some((matcher) => candidate.name.includes(matcher)),
+              );
+            };
+
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+            let checkRuns = await fetchCheckRuns();
 
             const iconFor = (conclusion, expected) => {
               if (conclusion === "success") {
@@ -134,6 +171,40 @@ jobs:
               return "unknown";
             };
 
+            let codeqlWaitTimedOut = false;
+
+            if (waitForCodeQL) {
+              const codeqlTarget = scannerTargets.find((target) => target.label === "CodeQL");
+              const timeoutAt = Date.now() + waitTimeoutMinutes * 60 * 1000;
+
+              while (Date.now() < timeoutAt) {
+                const codeqlRuns = getMatchingRuns(checkRuns, codeqlTarget);
+                const codeqlConclusion = aggregateConclusion(codeqlRuns);
+                const hasStarted = codeqlRuns.length > 0;
+                const isDone = hasStarted && !["queued", "in_progress"].includes(codeqlConclusion);
+
+                if (isDone) {
+                  core.info(`CodeQL checks completed with conclusion: ${codeqlConclusion}.`);
+                  break;
+                }
+
+                core.info(
+                  hasStarted
+                    ? `Waiting for CodeQL checks to complete (current: ${codeqlConclusion})...`
+                    : "Waiting for CodeQL checks to appear for this commit...",
+                );
+
+                await sleep(pollIntervalSeconds * 1000);
+                checkRuns = await fetchCheckRuns();
+              }
+
+              const finalCodeqlRuns = getMatchingRuns(checkRuns, codeqlTarget);
+              const finalCodeqlConclusion = aggregateConclusion(finalCodeqlRuns);
+              if (finalCodeqlRuns.length === 0 || ["queued", "in_progress"].includes(finalCodeqlConclusion)) {
+                codeqlWaitTimedOut = true;
+              }
+            }
+
             const safeCheckRuns = checkRuns.filter(
               (candidate) => candidate && typeof candidate.name === "string",
             );
@@ -181,6 +252,17 @@ jobs:
             const reportTitle = process.env.REPORT_NAME;
             const runUrl = `${context.serverUrl}/${owner}/${repo}/actions/runs/${context.runId}`;
             const branchName = process.env.GITHUB_REF_NAME;
+            const unexpectedFailures = rows.filter(
+              (row) => row.conclusion === "failure" && !row.notes.includes("Expected baseline failure"),
+            );
+            const expectedFailures = rows.filter(
+              (row) => row.conclusion === "failure" && row.notes.includes("Expected baseline failure"),
+            );
+            const missingChecks = rows.filter((row) => row.conclusion === "not_found");
+            const stillRunning = rows.filter(
+              (row) => row.conclusion === "queued" || row.conclusion === "in_progress",
+            );
+            const releaseReady = unexpectedFailures.length === 0 && stillRunning.length === 0;
 
             const lines = [];
             lines.push(`# ${reportTitle}`);
@@ -190,6 +272,13 @@ jobs:
             lines.push(`- Commit: ${context.sha}`);
             lines.push(`- Workflow run: ${runUrl}`);
             lines.push(`- Generated at (UTC): ${timestamp}`);
+            lines.push(`- Release readiness: ${releaseReady ? "READY" : "BLOCKED"}`);
+            lines.push(
+              `- CodeQL wait policy: ${waitForCodeQL ? `enabled (timeout reached: ${codeqlWaitTimedOut ? "yes" : "no"})` : "disabled"}`,
+            );
+            lines.push(
+              `- Report totals: ${rows.length} checks, ${unexpectedFailures.length} unexpected failures, ${expectedFailures.length} expected baseline failures, ${stillRunning.length} still running, ${missingChecks.length} missing`,
+            );
             lines.push("");
             lines.push("## Scanner Status Overview");
             lines.push("");
@@ -208,6 +297,8 @@ jobs:
             lines.push("- WARN rows marked as expected baseline failures are currently accepted for this capstone stage.");
             lines.push("- FAIL rows indicate unexpected blocking issues requiring remediation.");
             lines.push("- PASS rows indicate the corresponding scanner/check succeeded.");
+            lines.push("- INFO rows indicate missing check runs and should be treated as a workflow configuration signal.");
+            lines.push("- RUN rows indicate checks still in progress at report generation time.");
 
             const reportBody = `${lines.join("\n")}\n`;
             const reportPath = "security-feedback-report.md";
