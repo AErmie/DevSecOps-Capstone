@@ -69,7 +69,10 @@ jobs:
           docker build -t python-fastapi:${{ github.sha }} .
 
       - name: Run Trivy Vulnerability Scanner
+        uses: aquasecurity/trivy-action@0.35.0
         with:
+          image-ref: "python-fastapi:${{ github.sha }}"
+          format: "sarif"
           output: "trivy-results.sarif"
           severity: "CRITICAL,HIGH"
           vuln-type: "library"
