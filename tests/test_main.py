@@ -31,6 +31,17 @@ def test_index():
     assert response.json() == {"message": "Hello World!"}
 
 
+def test_health_check():
+    """
+    Test the readiness route (`/health`).
+
+    Ensures the endpoint returns a 200 status code and a ready response body.
+    """
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
 def test_get_user_sql_injection():
     """
     Test the `/users` endpoint for SQL injection vulnerability.

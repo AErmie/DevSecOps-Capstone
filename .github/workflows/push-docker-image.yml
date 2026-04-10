@@ -59,8 +59,12 @@ jobs:
 
       - name: Tag Docker Image
         run: |
-          docker tag ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ github.sha }} ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:latest
-          docker tag ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ github.sha }} ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:testing
+          docker tag \
+            ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:latest
+          docker tag \
+            ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:testing
 
 
       # Push the Docker image to the registry

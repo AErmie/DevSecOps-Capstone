@@ -69,10 +69,7 @@ jobs:
           docker build -t python-fastapi:${{ github.sha }} .
 
       - name: Run Trivy Vulnerability Scanner
-        uses: aquasecurity/trivy-action@0.35.0
         with:
-          image-ref: "python-fastapi:${{ github.sha }}"
-          format: "sarif"
           output: "trivy-results.sarif"
           severity: "CRITICAL,HIGH"
           vuln-type: "library"
@@ -86,26 +83,39 @@ jobs:
 
   owasp_zap_scan:
     runs-on: ubuntu-latest
-    name: app scan
+    name: Run OWASP ZAP DAST scan
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Build and tag image
-      # Run Docker image in detached mode
-      - name: Build Docker Image
+      - name: Build and start target container
         run: |
           docker build -t python-fastapi:${{ github.sha }} .
-          docker run -d -p 8080:8080 python-fastapi:${{ github.sha }}
+          docker run -d --name skyline-dast-target -p 8080:8080 python-fastapi:${{ github.sha }}
 
-      - name: Wait for Docker container to be ready
-        run: sleep 30
+      - name: Wait for application readiness
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:8080/health > /dev/null; then
+              echo "Skyline target is ready for DAST."
+              exit 0
+            fi
 
-      - name: Confirm Docker container is running
-        run: docker ps
+            echo "Waiting for Skyline target readiness (attempt ${attempt}/30)..."
+            sleep 2
+          done
 
-      # Run OWASP ZAP scan
-      - name: zap scan
+          echo "Skyline target failed readiness checks."
+          docker ps -a
+          docker logs skyline-dast-target || true
+          exit 1
+
+      - name: Confirm application endpoints are reachable
+        run: |
+          curl --silent --fail http://127.0.0.1:8080/health
+          curl --silent --fail http://127.0.0.1:8080/openapi.json > /dev/null
+
+      - name: Run OWASP ZAP API scan
         uses: zaproxy/action-api-scan@v0.9.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -114,3 +124,9 @@ jobs:
           target: "http://127.0.0.1:8080/openapi.json"
           cmd_options: "-a"
           allow_issue_writing: false
+          fail_action: true
+          artifact_name: zap-api-scan-report
+
+      - name: Clean up DAST container
+        if: always()
+        run: docker rm -f skyline-dast-target || true
