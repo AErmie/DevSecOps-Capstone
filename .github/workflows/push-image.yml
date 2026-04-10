@@ -27,4 +27,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: user/app:latest
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/python-fastapi:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/python-fastapi:${{ github.sha }}

@@ -64,10 +64,9 @@ jobs:
             );
 
             const isHighOrCritical = (alert) => {
-              // `security_severity_level` is primary; `severity` is kept as fallback for rule metadata variance.
+              // Gate only on CodeQL security severity, not query severity labels.
               const level = String(alert?.rule?.security_severity_level || '').toLowerCase();
-              const severity = String(alert?.rule?.severity || '').toLowerCase();
-              return level === 'high' || level === 'critical' || severity === 'high' || severity === 'error';
+              return level === 'high' || level === 'critical';
             };
 
             const blockers = alerts.filter(isHighOrCritical);

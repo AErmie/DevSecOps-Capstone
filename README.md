@@ -34,12 +34,12 @@ Use these commands before opening a pull request:
 
 ```bash
 python -m pip install -r requirements.txt
+python -m pip install pre-commit
 python -m pytest tests/
 python -m pylint .
 python -m black --check .
-# Run twice: first pass may auto-fix files, second confirms a clean state.
 pre-commit run --all-files
-pre-commit run --all-files
+# Re-run the same command once more to confirm a clean post-fix state.
 ```
 
 ## Repository Hygiene Files
