@@ -70,6 +70,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Debug - Print received inputs
+        run: |
+          echo "DEBUG INPUTS:"
+          echo "  source_sha input: '${{ inputs.source_sha }}'"
+          echo "  fallback_sha input: '${{ inputs.fallback_sha }}'"
+          echo "  context github.sha: '${{ github.sha }}'"
+          echo "  pull_request.head.sha (if available): '${{ github.event.pull_request.head.sha }}'"
+
       - name: Build consolidated security report
         id: build_report
         uses: actions/github-script@v7
