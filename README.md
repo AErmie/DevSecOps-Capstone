@@ -120,7 +120,7 @@ change was blocked, which checks failed, and what needs remediation.
   to the Actions summary for immediate visibility.
 - **GitHub PR comment broadcast**: PR runs publish or update a single
   bot-managed security intelligence comment in real time.
-- **README status badge**: Added `Security Scans Passing` badge to signal
+- **README status badge**: Added `Security Scans` badge to signal
   security pipeline health from the main orchestrator workflow.
 
 ### Phase 4 Flow
