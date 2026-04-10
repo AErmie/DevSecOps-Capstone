@@ -134,35 +134,59 @@ jobs:
             const pollIntervalSeconds = Number(process.env.CODEQL_POLL_INTERVAL_SECONDS || 10);
 
             const fetchCheckRunsForRef = async (ref) => {
-              return github.paginate(
-                github.rest.checks.listForRef,
-                {
+              const collected = [];
+              let page = 1;
+
+              while (true) {
+                const response = await github.rest.checks.listForRef({
                   owner,
                   repo,
                   ref,
                   per_page: 100,
-                },
-                (response) => response.data.check_runs,
-              );
+                  page,
+                });
+
+                const runs = Array.isArray(response.data.check_runs)
+                  ? response.data.check_runs.filter(Boolean)
+                  : [];
+                collected.push(...runs);
+
+                if (runs.length < 100) {
+                  break;
+                }
+                page += 1;
+              }
+
+              return collected;
             };
 
             const fetchWorkflowJobsAsCheckRuns = async () => {
               const workflowRunId = Number(process.env.CALLER_RUN_ID || context.runId);
-              const jobs = await github.paginate(
-                github.rest.actions.listJobsForWorkflowRun,
-                {
+              const jobs = [];
+              let page = 1;
+
+              while (true) {
+                const response = await github.rest.actions.listJobsForWorkflowRun({
                   owner,
                   repo,
                   run_id: workflowRunId,
                   per_page: 100,
-                },
-                (response) => response.data.jobs,
-              );
+                  page,
+                });
 
-              core.info(`Collected ${jobs.length} workflow jobs from run ${workflowRunId}.`);
+                const pageJobs = Array.isArray(response.data.jobs)
+                  ? response.data.jobs.filter(Boolean)
+                  : [];
+                jobs.push(...pageJobs);
 
-              return (jobs || [])
-                .filter((job) => job && typeof job.id !== "undefined")
+                if (pageJobs.length < 100) {
+                  break;
+                }
+                page += 1;
+              }
+
+              return jobs
+                .filter((job) => typeof job.id !== "undefined")
                 .map((job) => ({
                 id: job.id,
                 name: job.name,
@@ -176,7 +200,6 @@ jobs:
               const allRuns = [];
               for (const ref of candidateRefs) {
                 const refRuns = await fetchCheckRunsForRef(ref);
-                core.info(`Collected ${refRuns.length} check-runs for ref ${ref}.`);
                 allRuns.push(...refRuns);
               }
 
@@ -217,8 +240,6 @@ jobs:
             const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
             let checkRuns = await fetchCheckRuns();
-            core.info(`Total collected run signals: ${checkRuns.length}`);
-            core.info(`Sample run names: ${checkRuns.slice(0, 15).map((run) => run.name).join(" | ")}`);
 
             const iconFor = (conclusion, expected) => {
               if (conclusion === "success") {
