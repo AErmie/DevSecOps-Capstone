@@ -2,7 +2,11 @@ name: Push Docker Image
 
 
 on:
-    workflow_call:
+  workflow_call:
+
+permissions:
+  contents: read
+  packages: write
 
 env:
   # Use docker.io for Docker Hub if empty
@@ -13,6 +17,9 @@ env:
 jobs:
   Push_Image:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,12 +29,6 @@ jobs:
         uses: ASzc/change-string-case-action@v8
         with:
           string: ${{ github.repository_owner }}
-
-      - name: Report Lowercase String
-        id: step2
-        run: |
-          echo ${{ steps.string.outputs.lowercase }}
-          echo "REPO_OWNER=${{ steps.string.outputs.lowercase }}" >>${GITHUB_ENV}
 
       # Set up Docker Buildx
       - name: Set up Docker Buildx
@@ -39,7 +40,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME }}
+          images: ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}
 
       # Login against a Docker registry
       - name: Log into registry ${{ env.REGISTRY }}
@@ -47,24 +48,24 @@ jobs:
         uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
+          username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
 
       # Build and tag Docker Image
       - name: Build Docker Image
         run: |
-          docker build -t ghcr.io/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
+          docker build -t ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ github.sha }} .
 
       - name: Tag Docker Image
         run: |
-          docker tag ghcr.io/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }} ghcr.io/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME }}:latest
-          docker tag ghcr.io/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }} ghcr.io/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME }}:testing
+          docker tag ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ github.sha }} ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:latest
+          docker tag ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ github.sha }} ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:testing
 
 
       # Push the Docker image to the registry
       - name: Push Docker Image to GHCR
         run: |
-          docker push ghcr.io/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-          docker push ghcr.io/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME }}:latest
-          docker push ghcr.io/${{ env.REPO_OWNER }}/${{ env.IMAGE_NAME }}:testing
+          docker push ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          docker push ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:latest
+          docker push ghcr.io/${{ steps.string.outputs.lowercase }}/${{ env.IMAGE_NAME }}:testing
