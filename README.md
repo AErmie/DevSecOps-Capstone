@@ -32,7 +32,10 @@ Any pull request or push containing high-severity security risk fails CI and mus
 
 - Implemented: SAST (Semgrep + CodeQL) and SCA (Trivy library scan) gates are active in GitHub Actions.
 - Implemented: High/Critical policy is enforced as a hard fail in CI.
-- Current validation behavior: this intentionally vulnerable baseline triggers Trivy findings (for example `h11`, `starlette`, `black`) at HIGH/CRITICAL severity, so the PR security gate fails as expected until vulnerabilities are remediated.
+- Current validation behavior: this intentionally vulnerable baseline triggers
+	Trivy findings (for example `h11`, `starlette`, `black`) at HIGH/CRITICAL
+	severity, so the PR security gate fails as expected until vulnerabilities are
+	remediated.
 
 ## Local Validation
 
