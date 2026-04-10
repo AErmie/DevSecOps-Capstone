@@ -75,7 +75,6 @@ ever reaching the repository.
   `gitleaks/gitleaks-action@v2` scan with `fetch-depth: 0` (full history) on
   every PR and push.
 - **`pr.yml` / `main.yml`**: Both orchestrators call the new `secret-scan` job
-- **`pr.yml` / `main.yml`**: Both orchestrators call the new `secret-scan` job
   and gate `build-image` on it (`needs: secret-scan`).  A leak blocks the
   pipeline before a single build artefact is created.
 - **`.gitleaks.toml`**: GitLeaks policy file that extends the built-in ruleset
