@@ -140,6 +140,27 @@ jobs:
               );
             };
 
+            const fetchWorkflowJobsAsCheckRuns = async () => {
+              const jobs = await github.paginate(
+                github.rest.actions.listJobsForWorkflowRun,
+                {
+                  owner,
+                  repo,
+                  run_id: context.runId,
+                  per_page: 100,
+                },
+                (response) => response.data.jobs,
+              );
+
+              return jobs.map((job) => ({
+                id: job.id,
+                name: job.name,
+                status: job.status,
+                conclusion: job.conclusion,
+                html_url: job.html_url,
+              }));
+            };
+
             const fetchCheckRuns = async () => {
               const allRuns = [];
               for (const ref of candidateRefs) {
@@ -157,6 +178,12 @@ jobs:
 
                 seenIds.add(run.id);
                 deduped.push(run);
+              }
+
+              // Fallback to workflow jobs when check-run lookup is empty.
+              if (deduped.length === 0) {
+                core.info("No check runs found for candidate refs; falling back to current workflow jobs.");
+                return fetchWorkflowJobsAsCheckRuns();
               }
 
               return deduped;
