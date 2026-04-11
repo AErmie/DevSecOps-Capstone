@@ -7,6 +7,10 @@ on:
       - synchronize
       - reopened
 
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   security-events: write
@@ -27,3 +31,28 @@ jobs:
     unit-sec-scan:
         uses: ./.github/workflows/unit-sec-test.yml
         needs: lint-format
+
+    security-feedback-report:
+        if: always()
+        permissions:
+          contents: read
+          actions: read
+          checks: read
+          pull-requests: write
+          issues: write
+        needs:
+          - secret-scan
+          - build-image
+          - lint-format
+          - unit-sec-scan
+        uses: ./.github/workflows/security-report.yml
+        with:
+          report_name: PR Security Feedback Report
+          artifact_name: pr-security-feedback-report
+          post_pr_comment: true
+          pr_number: ${{ github.event.pull_request.number }}
+          head_repo_full_name: ${{ github.event.pull_request.head.repo.full_name }}
+          source_sha: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.sha || '' }}
+          fallback_sha: ${{ github.sha }}
+          caller_run_id: ${{ github.run_id }}
+          wait_for_codeql: false

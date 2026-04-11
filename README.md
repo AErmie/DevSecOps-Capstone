@@ -1,5 +1,7 @@
 # DevSecOps-Capstone
 
+[![Security Scans](https://github.com/AErmie/DevSecOps-Capstone/actions/workflows/main.yml/badge.svg)](https://github.com/AErmie/DevSecOps-Capstone/actions/workflows/main.yml)
+
 [Capstone project reference](https://devsecblueprint.com/learn/devsecops/capstone/index)
 
 ## Phase 1: Securing the DNA (SAST + SCA)
@@ -63,7 +65,7 @@ Phase 3 eliminates the hardcoded credential that has been present since the
 initial commit and adds automated guardrails that prevent new secrets from
 ever reaching the repository.
 
-### What changed
+### Secrets and Config Enhancements
 
 - **`main.py`**: `API_SECRET` is no longer a module-level constant.  The
   `/secure-data` endpoint now reads `os.getenv("API_SECRET")` at request time so
@@ -102,6 +104,39 @@ scan.  The pipeline blocks on any new credential leakage, and the existing
 codebase has been remediated so that no plaintext secret remains in the
 current working tree.  Historical findings are acknowledged by commit SHA in
 `.gitleaks.toml`; no literal credential value is stored in any tracked file.
+
+## Phase 4: The Nervous System (Feedback & Reporting)
+
+Phase 4 adds continuous security visibility so developers see exactly why a
+change was blocked, which checks failed, and what needs remediation.
+
+### What changed
+
+- **`security-report.yml`**: New reusable workflow that aggregates security
+  check outcomes into a single professional Markdown report.
+- **`pr.yml` / `main.yml`**: New terminal `security-feedback-report` job runs
+  with `if: always()` after the security chain and publishes report artifacts.
+- **GitHub Step Summary broadcast**: Every run appends the consolidated report
+  to the Actions summary for immediate visibility.
+- **GitHub PR comment broadcast**: PR runs publish or update a single
+  bot-managed security intelligence comment in real time.
+- **README status badge**: Added `Security Scans` badge to signal
+  security pipeline health from the main orchestrator workflow.
+
+### Phase 4 Flow
+
+1. Security jobs execute through the existing chain (secret scan, build,
+   lint, SAST/SCA, DAST).
+2. Reporting job runs regardless of upstream success (`if: always()`).
+3. Workflow collects check-run conclusions and synthesizes one Markdown report.
+4. Report is uploaded as a GitHub artifact and appended to Step Summary.
+5. On pull requests, the bot posts or updates a persistent security comment.
+
+### Phase 4 Milestone Outcome
+
+Skyline now has an automated reporting system that turns raw scanner results
+into actionable developer feedback, broadcasts real-time status inside GitHub,
+and provides a visible release-readiness badge for security pipeline health.
 
 ## Local Validation
 

@@ -2,7 +2,7 @@ name: Main Workflow
 on:
   push:
     branches:
-      - main
+    - main
   workflow_dispatch:
 
 permissions:
@@ -31,3 +31,22 @@ jobs:
   push-docker-image:
     uses: ./.github/workflows/push-docker-image.yml
     needs: unit-sec-scan
+
+  security-feedback-report:
+    if: always()
+    permissions:
+      contents: read
+      actions: read
+      checks: read
+    needs:
+      - secret-scan
+      - build-image
+      - lint-format
+      - unit-sec-scan
+    uses: ./.github/workflows/security-report.yml
+    with:
+      report_name: Main Branch Security Feedback Report
+      artifact_name: main-security-feedback-report
+      source_sha: ${{ github.sha }}
+      caller_run_id: ${{ github.run_id }}
+      wait_for_codeql: false
