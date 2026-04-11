@@ -1,6 +1,6 @@
 # DevSecOps-Capstone
 
-[![Security Scans](https://github.com/AErmie/DevSecOps-Capstone/actions/workflows/main.yml/badge.svg)](https://github.com/AErmie/DevSecOps-Capstone/actions/workflows/main.yml)
+[![Security Scans Passing](https://github.com/AErmie/DevSecOps-Capstone/actions/workflows/main.yml/badge.svg)](https://github.com/AErmie/DevSecOps-Capstone/actions/workflows/main.yml)
 
 [Capstone project reference](https://devsecblueprint.com/learn/devsecops/capstone/index)
 
