@@ -199,8 +199,12 @@ jobs:
             const fetchCheckRuns = async () => {
               const allRuns = [];
               for (const ref of candidateRefs) {
-                const refRuns = await fetchCheckRunsForRef(ref);
-                allRuns.push(...refRuns);
+                try {
+                  const refRuns = await fetchCheckRunsForRef(ref);
+                  allRuns.push(...refRuns);
+                } catch (err) {
+                  core.info(`Skipping ref ${ref} due to API error: ${err.message}`);
+                }
               }
 
               // Also include jobs from the current workflow run. In some PR contexts,

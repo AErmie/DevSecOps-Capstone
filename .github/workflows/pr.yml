@@ -52,7 +52,7 @@ jobs:
           post_pr_comment: true
           pr_number: ${{ github.event.pull_request.number }}
           head_repo_full_name: ${{ github.event.pull_request.head.repo.full_name }}
-          source_sha: ${{ github.event.pull_request.head.sha }}
+          source_sha: ${{ github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.sha || '' }}
           fallback_sha: ${{ github.sha }}
           caller_run_id: ${{ github.run_id }}
           wait_for_codeql: false
